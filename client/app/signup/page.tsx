@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import axios from 'axios'
 import Link from "next/link"
-import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +17,8 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const { signUp, loading } = useAuth()
+  const [serverError, setServerError] = useState<string>("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const validateForm = () => {
@@ -51,14 +51,36 @@ export default function SignUpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    setServerError("") // Clear previous server error
+
     if (!validateForm()) {
       return
     }
 
     try {
-      await signUp(name, email, password)
-    } catch (error) {
-      console.error("Sign up error:", error)
+      setLoading(true)
+
+      // API call to backend
+      const response = await axios.post("http://localhost:5000/api/auth/register", {
+        name,
+        email,
+        password,
+        confirmPassword,
+      })
+
+      console.log("Signup success:", response.data)
+
+      // Redirect to login page after successful signup
+      router.push("/login")
+    } catch (error: any) {
+      console.error("Signup error:", error)
+      if (error.response && error.response.data && error.response.data.message) {
+        setServerError(error.response.data.message) // If backend sends a message
+      } else {
+        setServerError("Something went wrong. Please try again.")
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -72,8 +94,13 @@ export default function SignUpPage() {
           <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
           <CardDescription>Enter your information to create an account</CardDescription>
         </CardHeader>
+
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {serverError && (
+              <p className="text-center text-red-500 text-sm">{serverError}</p>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -85,6 +112,7 @@ export default function SignUpPage() {
               />
               {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -96,11 +124,18 @@ export default function SignUpPage() {
               />
               {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
               {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input
@@ -109,13 +144,17 @@ export default function SignUpPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
-              {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
+              {errors.confirmPassword && (
+                <p className="text-sm text-red-500">{errors.confirmPassword}</p>
+              )}
             </div>
           </CardContent>
+
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
+
             <div className="text-center text-sm">
               Already have an account?{" "}
               <Link href="/login" className="underline text-primary">
